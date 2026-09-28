@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme Cloud (vulnerable fixture)</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="shell">
+      <aside id="sidebar">
+        <div class="brand">☁︎ Acme Cloud</div>
+        <!-- Navigation is built dynamically in JS and varies by role. -->
+        <nav id="nav"></nav>
+        <div id="presence" class="presence">connecting…</div>
+      </aside>
+      <div id="content">
+        <header id="topbar">
+          <div id="crumbs"></div>
+          <div id="whoami" class="whoami">…</div>
+        </header>
+        <main id="view">Loading…</main>
+      </div>
+    </div>
+    <div id="modal" class="modal hidden"><div class="modal-card"><button id="modal-close">✕</button><div id="modal-body"></div></div></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

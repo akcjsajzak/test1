@@ -48,6 +48,22 @@ CLI ─▶ Scan Orchestrator ─▶ Browser Engine (isolated contexts) ─▶ Ne
                          └▶ Inventory ─▶ Normalizer ─▶ Replay ─▶ Comparator ─▶ AuthZ Analyzers ─▶ Reporter
 ```
 
+## Test fixtures
+
+Two deliberately-vulnerable apps back the automated tests:
+
+- [`test-app/`](test-app/README.md) — a compact SPA covering the core horizontal,
+  vertical and mistaken-exposure cases.
+- [`test-app-enterprise/`](test-app-enterprise/README.md) — **Acme Cloud**, a
+  realistic multi-tenant SaaS (4 privilege tiers, nested resources, numeric/UUID/
+  slug ids, pagination, SSE and WebSocket) with a full matrix of broken and
+  correct access controls. The end-to-end test scans it and asserts every planted
+  issue is found and every secured endpoint is not.
+
+```bash
+npm test          # unit + integration + both end-to-end scans
+```
+
 ## License
 
 MIT. Provided for lawful, authorized security testing only.

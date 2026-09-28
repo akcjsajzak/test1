@@ -18,6 +18,7 @@ const ISO_TS_RE = /^\d{4}-\d{2}-\d{2}[tT]\d{2}:\d{2}/;
 const NUMERIC_RE = /^\d+$/;
 const JWT_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const LONG_TOKEN_RE = /^[A-Za-z0-9_-]{20,}$/;
+const SLUG_RE = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+$/;
 
 /** Query keys whose values are dynamic regardless of content. */
 const DYNAMIC_QUERY_KEYS = new Set([
@@ -50,6 +51,10 @@ export function classifySegment(seg: string): string | null {
   // Mixed alphanumeric segments that also contain a digit and are long are
   // very likely opaque identifiers (slugs with numbers, base62 ids).
   if (seg.length >= 20 && LONG_TOKEN_RE.test(seg) && /\d/.test(seg)) return '{token}';
+  // Hyphenated slugs that carry a digit (e.g. "q3-financials-8842") are almost
+  // always resource identifiers rather than fixed route names ("feature-flags",
+  // which carries no digit, stays literal).
+  if (seg.length >= 12 && SLUG_RE.test(seg) && /\d/.test(seg)) return '{slug}';
   return null;
 }
 

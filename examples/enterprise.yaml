@@ -1,0 +1,34 @@
+# Config for the complex multi-tenant fixture (test-app-enterprise/).
+#
+#   PORT=4200 npm run test:app:enterprise
+#   export ALICE=tok_alice BOB=tok_bob MALLORY=tok_mallory ADMIN=tok_admin ROOT=tok_root
+#   node dist/cli.js scan --config examples/enterprise.yaml --output ./results
+
+authorizedTesting: true
+
+target:
+  url: "http://127.0.0.1:4200/"
+
+users:
+  - { name: "alice",     role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${ALICE}" }] }
+  - { name: "bob",       role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${BOB}" }] }
+  - { name: "mallory",   role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${MALLORY}" }] }  # different tenant
+  - { name: "admin1",    role: "org_admin",   privilegeLevel: 80,  cookies: [{ name: "session", value: "${ADMIN}" }] }
+  - { name: "root",      role: "super_admin", privilegeLevel: 120, cookies: [{ name: "session", value: "${ROOT}" }] }
+  - { name: "anonymous", role: "anonymous",   privilegeLevel: 0 }
+
+crawl:
+  maxDepth: 4
+  maxPages: 20
+  # Navigation-only keeps runs fast + deterministic; each route auto-fetches its
+  # data so the whole API surface is still observed. Set interact: true to also
+  # drive tabs/modals/buttons.
+  interact: false
+  settleMs: 150
+
+scope:
+  requestsPerSecond: 40
+
+output:
+  dir: "./results"
+  formats: ["json", "html"]

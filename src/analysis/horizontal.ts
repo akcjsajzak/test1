@@ -30,7 +30,7 @@ import {
 } from './authz-common';
 
 /** Placeholders that indicate an object-referencing (per-resource) endpoint. */
-const OBJECT_REF_RE = /\{(id|uuid|objectid|hex|token|seg)\d*\}/;
+const OBJECT_REF_RE = /\{(id|uuid|objectid|hex|token|slug|seg)\d*\}/;
 
 export class HorizontalAnalyzer implements Analyzer {
   readonly id = 'AUTHZ-HORIZONTAL';

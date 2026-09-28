@@ -18,6 +18,14 @@ describe('classifySegment', () => {
     expect(classifySegment('admin')).toBeNull();
     expect(classifySegment('me')).toBeNull();
   });
+  it('templates hyphenated slugs that carry a digit', () => {
+    expect(classifySegment('q3-financials-8842')).toBe('{slug}');
+    expect(classifySegment('globex-roadmap-3310')).toBe('{slug}');
+  });
+  it('keeps hyphenated route names without a digit literal', () => {
+    expect(classifySegment('feature-flags')).toBeNull();
+    expect(classifySegment('sign-in')).toBeNull();
+  });
 });
 
 describe('normalizeRequest', () => {
