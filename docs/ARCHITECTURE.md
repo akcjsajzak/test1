@@ -57,12 +57,20 @@ isolation and new detection engines can be added without touching the core.
    identifier-like segments (REST collection names are preserved).
 6. **Inventory** groups normalized requests per user.
 7. **AuthZ Engine** runs the registered analyzers — **horizontal** (object-level
-   / IDOR, tenant-aware), **vertical** (privilege escalation) and, opt-in, an
-   **active IDOR enumeration** sweep. Each uses the **Replay Engine**
-   (safe-by-default, secret-free, scoped) and the **Comparator** (content-type-
-   aware, dynamic-field-ignoring, denial-detecting) to decide findings with
-   graded confidence. When users declare a `tenant`, cross-tenant access is
-   elevated and same-tenant sharing of tenant-scoped resources de-prioritized.
+   / IDOR, tenant-aware), **vertical** (privilege escalation), **auth-state**
+   (endpoints reachable with no session), and, opt-in, an **active IDOR
+   enumeration** sweep. Each uses the **Replay Engine** (safe-by-default,
+   secret-free, scoped) and the **Comparator** (content-type-aware,
+   dynamic-field-ignoring, denial-detecting) to decide findings with graded
+   confidence. When users declare a `tenant`, cross-tenant access is elevated and
+   same-tenant sharing of tenant-scoped resources de-prioritized.
+
+   **GraphQL** requests are recognized during normalization and split into
+   per-operation endpoints (operation type + root field), with variables treated
+   as object references — so the same analyzers cover GraphQL; queries replay as
+   safe reads. A scripted **login recorder** (`record-login`, or an inline
+   per-user `login` block) obtains sessions by driving the login form instead of
+   hand-pasted cookies.
 8. **Reporter** emits `report.json` (machine-readable) and `report.html`
    (human-readable), each finding carrying evidence and redacted request/response
    snapshots.

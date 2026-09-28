@@ -48,6 +48,15 @@ CLI ─▶ Scan Orchestrator ─▶ Browser Engine (isolated contexts) ─▶ Ne
                          └▶ Inventory ─▶ Normalizer ─▶ Replay ─▶ Comparator ─▶ AuthZ Analyzers ─▶ Reporter
 ```
 
+**Detection engines** (extensible via the analyzer registry): horizontal
+(object-level / IDOR, tenant-aware), vertical (privilege escalation),
+authentication-state (endpoints reachable with no session), and an opt-in active
+IDOR/enumeration sweep. REST and **GraphQL** are both covered. Sessions can be
+obtained by hand-pasted cookies or a scripted **login recorder** (`record-login`
+or an inline `login` block).
+
+**Commands:** `scan`, `discover`, `compare`, `report`, `record-login`.
+
 ## Test fixtures
 
 Two deliberately-vulnerable apps back the automated tests:

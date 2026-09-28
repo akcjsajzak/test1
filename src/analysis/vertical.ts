@@ -54,6 +54,8 @@ export class VerticalAnalyzer implements Analyzer {
 
       {
         for (const testUser of ctx.users) {
+          // Unauthenticated access is the auth-state analyzer's domain.
+          if (testUser.authenticated === false) continue;
           const testPriv = privileges.get(testUser.name) ?? 10;
           if (testPriv >= highPriv) continue; // only test strictly lower privilege
 

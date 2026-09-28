@@ -7,11 +7,12 @@
  *   web-auth-auditor compare  --config config.yaml --output ./results   (scan, focused on findings)
  *   web-auth-auditor report   --input ./results/report.json --output ./results  (re-render HTML)
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { Command } from 'commander';
 import { createLogger } from './core/logger';
 import { loadConfig, ConfigError } from './config/loader';
 import { runScan, AuthorizationError } from './orchestrator/scan';
+import { recordLogins } from './orchestrator/record-login';
 import { writeHtmlReport } from './report';
 import type { Finding, Severity } from './core/types';
 import { SEVERITY_ORDER } from './report';
@@ -88,6 +89,51 @@ attachCommon(
 attachCommon(
   program.command('compare').description('run a full scan and focus output on cross-context findings'),
 ).action((opts: CommonOpts) => doScan(opts, 'compare'));
+
+program
+  .command('record-login')
+  .description('run scripted logins from the config and capture session cookies to a file')
+  .requiredOption('-c, --config <path>', 'config file with per-user `login` blocks')
+  .option('-o, --out <path>', 'output file for captured cookies (contains secrets)', './sessions.json')
+  .option('-u, --user <name>', 'only record this user')
+  .option('--log-level <level>', 'log level', 'info')
+  .option('--pretty', 'human-readable logs')
+  .action(async (opts: { config: string; out: string; user?: string; logLevel: string; pretty?: boolean }) => {
+    const logger = createLogger({ level: opts.logLevel, pretty: opts.pretty });
+    let config;
+    try {
+      config = loadConfig(opts.config);
+    } catch (e) {
+      if (e instanceof ConfigError) {
+        process.stderr.write(`Configuration error:\n${e.message}\n`);
+        process.exitCode = 2;
+        return;
+      }
+      throw e;
+    }
+    try {
+      const results = await recordLogins(config, logger, { onlyUser: opts.user });
+      if (results.length === 0) {
+        process.stdout.write('No users with a `login` block were found in the config.\n');
+        return;
+      }
+      const out: { warning: string; users: Record<string, unknown> } = {
+        warning: 'Contains live session cookies — treat as secret; do not commit.',
+        users: {},
+      };
+      for (const r of results) {
+        process.stdout.write(`  ${r.ok ? '✓' : '✗'} ${r.user}${r.error ? ': ' + r.error : ''}\n`);
+        if (r.ok) out.users[r.user] = { cookies: r.cookies };
+      }
+      writeFileSync(opts.out, JSON.stringify(out, null, 2), 'utf8');
+      const okCount = results.filter((r) => r.ok).length;
+      process.stdout.write(`Captured ${okCount}/${results.length} session(s) to ${opts.out} (contains secrets)\n`);
+      if (okCount < results.length) process.exitCode = 1;
+    } catch (e) {
+      process.stderr.write(`record-login failed: ${(e as Error).message}\n`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command('report')

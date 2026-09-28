@@ -203,16 +203,32 @@ export function pickRepresentative(
   requestsById: Map<string, ObservedRequest>,
   requestIds: string[],
 ): ObservedRequest | undefined {
-  let firstGet: ObservedRequest | undefined;
+  let firstSafe: ObservedRequest | undefined;
   for (const id of requestIds) {
     const req = requestsById.get(id);
     if (!req) continue;
-    const method = req.method.toUpperCase();
-    if (method !== 'GET' && method !== 'HEAD') continue;
-    if (!firstGet) firstGet = req;
+    if (!isSafeToReplay(req)) continue;
+    if (!firstSafe) firstSafe = req;
     if (req.status !== undefined && req.status >= 200 && req.status < 300) return req;
   }
-  return firstGet;
+  return firstSafe;
+}
+
+/** A request is safe to replay/represent if it is a GET/HEAD or a GraphQL query. */
+export function isSafeToReplay(req: ObservedRequest): boolean {
+  const method = req.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return true;
+  if (req.graphql && req.graphql.operationType === 'query') return true;
+  return false;
+}
+
+const OBJECT_REF_RE = /\{(id|uuid|objectid|hex|token|slug|seg)\d*\}/;
+
+/** Whether a request targets a specific object (has an id-like variable). */
+export function isObjectRefRequest(req: ObservedRequest, signature: string): boolean {
+  if (OBJECT_REF_RE.test(signature)) return true;
+  if (req.graphql && req.graphql.variableCount > 0) return true;
+  return false;
 }
 
 export function evidence(label: string, detail: string): Evidence {

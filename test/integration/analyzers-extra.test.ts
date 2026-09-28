@@ -7,6 +7,7 @@ import { EndpointInventory } from '../../src/analysis/inventory';
 import type { AnalysisContext, Replayer, UserInfo } from '../../src/analysis/engine';
 import { HorizontalAnalyzer } from '../../src/analysis/horizontal';
 import { IdorEnumerationAnalyzer } from '../../src/analysis/idor';
+import { AuthStateAnalyzer } from '../../src/analysis/authstate';
 import type { ObservedRequest } from '../../src/core/types';
 
 const TARGET = 'https://app.test/';
@@ -177,5 +178,51 @@ describe('active IDOR / enumeration analyzer', () => {
     const ctx = buildCtx({ requests, users, replayer, idor: { enabled: false } });
     const findings = await new IdorEnumerationAnalyzer().analyze(ctx);
     expect(findings).toEqual([]);
+  });
+});
+
+describe('authentication-state analyzer', () => {
+  const users: UserInfo[] = [
+    { name: 'alice', role: 'member', privilegeLevel: 10, authenticated: true },
+    { name: 'anon', role: 'anonymous', privilegeLevel: 0, authenticated: false },
+  ];
+
+  // Under the unauthenticated identity: the admin panel is served (missing
+  // authn), /api/me is denied (authn enforced), and /api/public is public.
+  const replayer: Replayer = {
+    async replay(request, asUser) {
+      const base = {
+        originalRequestId: request.id, originalUser: request.user, replayUser: asUser,
+        method: request.method, url: request.url, requested: true,
+        contentType: 'application/json', timestamp: Date.now(),
+      };
+      if (/\/api\/admin\/panel/.test(request.url)) return { ...base, status: 200, responseBody: '{"panel":{"x":1}}' };
+      if (/\/api\/me/.test(request.url)) return { ...base, status: 401, responseBody: '{"error":"unauthorized"}' };
+      return { ...base, status: 200, responseBody: '{"items":[1,2,3]}' }; // public
+    },
+  };
+
+  it('flags a sensitive endpoint reachable with no session, but not enforced or public ones', async () => {
+    const requests = [
+      mkReq('alice', `${TARGET}api/admin/panel`, '{"panel":{"x":1}}'),
+      mkReq('alice', `${TARGET}api/me`, '{"id":1,"name":"Alice"}'),
+      mkReq('alice', `${TARGET}api/public`, '{"items":[1,2,3]}'),
+      mkReq('anon', `${TARGET}api/public`, '{"items":[1,2,3]}'), // public UI reached it too
+    ];
+    const ctx = buildCtx({ requests, users, replayer });
+    const findings = await new AuthStateAnalyzer().analyze(ctx);
+    const byUrl = (re: RegExp) => findings.find((f) => re.test(f.url ?? ''));
+    expect(byUrl(/\/api\/admin\/panel/)).toBeDefined();
+    expect(byUrl(/\/api\/admin\/panel/)?.tags).toContain('no-auth');
+    expect(byUrl(/\/api\/admin\/panel/)?.testUser).toBe('anon');
+    expect(byUrl(/\/api\/me/)).toBeUndefined(); // authn enforced (401)
+    expect(byUrl(/\/api\/public/)).toBeUndefined(); // public surface
+  });
+
+  it('returns nothing when no unauthenticated identity is configured', async () => {
+    const authedOnly: UserInfo[] = [{ name: 'alice', role: 'member', privilegeLevel: 10, authenticated: true }];
+    const requests = [mkReq('alice', `${TARGET}api/admin/panel`, '{"panel":{"x":1}}')];
+    const ctx = buildCtx({ requests, users: authedOnly, replayer });
+    expect(await new AuthStateAnalyzer().analyze(ctx)).toEqual([]);
   });
 });

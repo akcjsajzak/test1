@@ -30,6 +30,33 @@ referenced as `${ENV_VAR}` (or `${ENV_VAR:-default}`) and injected at runtime.
 | `cookies[]` | list | `[]` | `{ name, value, domain?, path?, httpOnly?, secure?, sameSite? }`. |
 | `headers[]` | list | `[]` | `{ name, value }` extra HTTP headers (e.g. `Authorization`). |
 | `localStorage[]` | list | `[]` | `{ name, value }` seeded into the isolated context. |
+| `login` | object | — | Optional scripted login (see below) instead of pasting cookies. |
+
+### `login` (scripted login)
+
+Obtain a session by driving the login form once, instead of extracting cookies
+by hand. Runs before the crawl; also usable standalone via `record-login`.
+
+| Field | Notes |
+| --- | --- |
+| `url` | Login page to open first (defaults to the target URL). |
+| `steps[]` | Ordered actions; each step sets one of: `goto`, `fill`+`value`, `type`+`value`, `click`, `press`, `waitForSelector`, `waitForUrl`, `waitFor` (`load`/`domcontentloaded`/`networkidle`), `waitMs`. |
+| `successUrlIncludes` | After the steps, assert the URL contains this (sanity check). |
+
+Put credentials in `value` as `${ENV}` — they authenticate but are never logged.
+
+```yaml
+users:
+  - name: alice
+    login:
+      url: "https://app.test/login"
+      steps:
+        - { fill: "#email", value: "${ALICE_EMAIL}" }
+        - { fill: "#password", value: "${ALICE_PASSWORD}" }
+        - { click: "button[type=submit]" }
+        - { waitForUrl: "/dashboard" }
+      successUrlIncludes: "/dashboard"
+```
 
 Privilege inference (when `privilegeLevel` is omitted): `anonymous/guest`=0,
 `user/member`=10, `editor`=30, `manager/staff/moderator`=50, `admin`=100,
@@ -70,6 +97,7 @@ Privilege inference (when `privilegeLevel` is omitted): `anonymous/guest`=0,
 | `enabled` | `true` | Master switch for cross-context replay. |
 | `allowedMethods` | `[GET, HEAD, OPTIONS]` | Only these are replayed… |
 | `allowDestructive` | `false` | …and mutating methods need this opt-in too. |
+| `allowGraphqlQueries` | `true` | Replay GraphQL *queries* (POST, but read-only) as safe; mutations still need `allowDestructive`. |
 | `maxReplays` | `500` | Replay budget. |
 
 ## `idor`

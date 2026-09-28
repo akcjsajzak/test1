@@ -16,6 +16,7 @@ import type {
   DiscoverySource,
   Finding,
   NavigationGraph,
+  NormalizedRequest,
   ObservedRequest,
   ScanResult,
 } from '../core/types';
@@ -25,12 +26,14 @@ import { BrowserEngine } from '../browser/engine';
 import type { UserSession } from '../browser/session';
 import { Explorer } from '../crawler/explorer';
 import { NormalizerState } from '../analysis/normalize';
+import { detectGraphql, graphqlSignature, type GraphqlParse } from '../analysis/graphql';
 import { EndpointInventory } from '../analysis/inventory';
 import { ReplayEngine } from '../analysis/replay';
 import { AnalyzerRegistry, type AnalysisContext } from '../analysis/engine';
 import { HorizontalAnalyzer } from '../analysis/horizontal';
 import { VerticalAnalyzer } from '../analysis/vertical';
 import { IdorEnumerationAnalyzer } from '../analysis/idor';
+import { AuthStateAnalyzer } from '../analysis/authstate';
 import { writeReports, type ReportBundle, type InventoryReportEntry } from '../report';
 
 export class AuthorizationError extends Error {
@@ -122,6 +125,13 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
           logger,
         });
         sessions.set(user.name, session);
+        if (user.login) {
+          try {
+            await session.login(user.login);
+          } catch (err) {
+            logger.warn({ user: user.name, err: (err as Error).message }, 'scripted login failed; crawling unauthenticated');
+          }
+        }
         const explorer = new Explorer({ session, scope, crawl: config.crawl, logger, log, targetUrl: target });
         const result = await explorer.explore();
         graphs.set(user.name, result.graph.build());
@@ -131,12 +141,20 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
       }
     }
 
-    // 2. Two-pass normalization over analyzable requests.
+    // 2. Two-pass normalization over analyzable requests (GraphQL-aware).
     const requestsById = log.idIndex();
     const analyzable = log.all().filter((r) => isAnalyzable(r, scope));
     const normalizer = new NormalizerState();
     for (const r of analyzable) normalizer.observe(r.method, r.url);
-    for (const r of analyzable) r.normalized = normalizer.normalize(r.method, r.url);
+    for (const r of analyzable) {
+      const gql = detectGraphql(r);
+      if (gql) {
+        r.graphql = gql.info;
+        r.normalized = graphqlNormalized(r, gql);
+      } else {
+        r.normalized = normalizer.normalize(r.method, r.url);
+      }
+    }
 
     // 3. Per-user endpoint inventory.
     const inventory = new EndpointInventory();
@@ -148,6 +166,7 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
       const registry = new AnalyzerRegistry()
         .register(new HorizontalAnalyzer())
         .register(new VerticalAnalyzer())
+        .register(new AuthStateAnalyzer())
         .register(new IdorEnumerationAnalyzer()); // no-ops unless config.idor.enabled
       for (const extra of opts.extraAnalyzers?.list() ?? []) registry.register(extra);
       const ctx: AnalysisContext = {
@@ -160,6 +179,7 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
           role: u.role,
           privilegeLevel: u.privilegeLevel,
           tenant: u.tenant === undefined ? undefined : String(u.tenant),
+          authenticated: hasAuthMaterial(u),
         })),
         replayer: replayEngine,
         scope,
@@ -219,6 +239,32 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
     for (const s of sessions.values()) await s.close();
     await engine.close();
   }
+}
+
+/** Whether a configured user carries any authentication material. */
+function hasAuthMaterial(u: Config['users'][number]): boolean {
+  return u.cookies.length > 0 || u.headers.length > 0 || u.localStorage.length > 0 || u.login !== undefined;
+}
+
+/** Build a per-operation normalized signature for a GraphQL request. */
+function graphqlNormalized(r: ObservedRequest, gql: GraphqlParse): NormalizedRequest {
+  let host = r.host;
+  let path = '/graphql';
+  try {
+    const u = new URL(r.url);
+    host = u.hostname;
+    path = u.pathname;
+  } catch {
+    /* keep defaults */
+  }
+  return {
+    signature: graphqlSignature(host, path, gql.info),
+    method: r.method.toUpperCase(),
+    host,
+    pathTemplate: path,
+    queryTemplate: '',
+    variables: gql.variables,
+  };
 }
 
 function isAnalyzable(r: ObservedRequest, scope: ScopeGuard): boolean {

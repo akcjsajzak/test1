@@ -46,6 +46,14 @@
     });
   }
 
+  function gql(query, variables) {
+    return fetch('/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ query: query, variables: variables || {} }),
+    }).catch(function () {});
+  }
+
   // ── routing ─────────────────────────────────────────────────────────────────
   var routes = [
     ['/dashboard', renderDashboard],
@@ -60,6 +68,7 @@
     ['/admin/metrics', renderPlatform],
     ['/search', renderSearch],
     ['/settings', renderSettings],
+    ['/login', renderLogin],
   ];
   function match(path) {
     for (var i = 0; i < routes.length; i++) {
@@ -97,6 +106,7 @@
     ];
     if (me && me.level >= 80) { items.push(['/invoices', 'Invoices']); items.push(['/admin', 'Admin']); }
     if (me && me.level >= 120) { items.push(['/admin/metrics', 'Platform']); }
+    if (!me) { items.push(['/login', 'Sign in']); }
     items.forEach(function (it) { nav.appendChild(link(it[0], it[1], 'nav-item')); });
   }
 
@@ -106,6 +116,7 @@
     api('/api/me').then(function (r) {
       view.appendChild(el('div', { class: 'card' }, [pre(r.body)]));
     });
+    gql('query { me { id name role } }'); // GraphQL identity (per-user)
     var quick = el('div', { class: 'quick' }, [
       link('/projects', 'Open projects →', 'chip'),
       link('/tickets', 'My tickets →', 'chip'),
@@ -201,6 +212,9 @@
     var box = el('div', { class: 'card' }); view.appendChild(box);
     api('/api/tickets/' + params.id).then(function (r) { box.appendChild(pre(r.body)); });
     api('/api/tickets/' + params.id + '/secure');
+    // GraphQL equivalents: an IDOR-prone query and a securely-checked one.
+    gql('query GetTicket($id: ID!){ ticket(id:$id){ id subject body ownerId } }', { id: params.id });
+    gql('query SecureTicket($id: ID!){ secureTicket(id:$id){ id subject } }', { id: params.id });
   }
 
   function renderUserProfile(params) {
@@ -240,6 +254,8 @@
     view.appendChild(a); view.appendChild(b);
     api('/api/admin/metrics').then(function (r) { a.appendChild(el('h3', { text: 'Metrics' })); a.appendChild(pre(r.body)); });
     api('/api/admin/orgs').then(function (r) { b.appendChild(el('h3', { text: 'Orgs (secured)' })); b.appendChild(pre(r.body)); });
+    // GraphQL: admin metrics with no role check (vertical).
+    gql('query { adminMetrics { orgs users mrr } }');
   }
 
   function renderSearch() {
@@ -256,6 +272,23 @@
   function renderSettings() {
     view.appendChild(el('h1', { text: 'Settings' }));
     view.appendChild(el('p', { text: 'Static settings page.' }));
+  }
+
+  function renderLogin() {
+    view.appendChild(el('h1', { text: 'Sign in' }));
+    var card = el('div', { class: 'card' });
+    var email = el('input', { type: 'email', id: 'email', placeholder: 'email' });
+    var pass = el('input', { type: 'password', id: 'password', placeholder: 'password' });
+    var btn = el('button', { id: 'login-submit', text: 'Sign in' });
+    var msg = el('div', { id: 'login-msg', class: 'whoami' });
+    btn.addEventListener('click', function () {
+      fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.value, password: pass.value }) })
+        .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
+        .then(function (res) { if (res.status === 200) { location.href = '/dashboard'; } else { msg.textContent = 'Invalid credentials'; } })
+        .catch(function () { msg.textContent = 'Login error'; });
+    });
+    [email, pass, btn, msg].forEach(function (n) { card.appendChild(n); });
+    view.appendChild(card);
   }
 
   // ── background streams / one-time boot side effects ─────────────────────────

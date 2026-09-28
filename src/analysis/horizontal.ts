@@ -18,6 +18,7 @@ import { compareResponses } from './compare';
 import {
   evidence,
   isDataBearingResource,
+  isObjectRefRequest,
   markersPresent,
   pickRepresentative,
   privilegeOf,
@@ -31,8 +32,6 @@ import {
 } from './authz-common';
 
 /** Placeholders that indicate an object-referencing (per-resource) endpoint. */
-const OBJECT_REF_RE = /\{(id|uuid|objectid|hex|token|slug|seg)\d*\}/;
-
 export class HorizontalAnalyzer implements Analyzer {
   readonly id = 'AUTHZ-HORIZONTAL';
   readonly title = 'Horizontal authorization (object-level / IDOR)';
@@ -45,11 +44,12 @@ export class HorizontalAnalyzer implements Analyzer {
     for (const sourceInv of ctx.inventory.allUsers()) {
       const sourcePriv = privileges.get(sourceInv.user) ?? 10;
       for (const [signature, obs] of sourceInv.endpoints) {
-        if (!OBJECT_REF_RE.test(signature)) continue; // only object-referencing endpoints
         const sourceReq = pickRepresentative(ctx.requestsById, obs.requestIds);
         if (!sourceReq || sourceReq.status === undefined || sourceReq.status < 200 || sourceReq.status >= 300) {
           continue; // need a successful baseline
         }
+        // Only object-referencing endpoints (path id, or a GraphQL op with variables).
+        if (!isObjectRefRequest(sourceReq, signature)) continue;
         if (ctx.scope.isExcludedFromAnalysis(sourceReq.url)) continue;
 
         const markers = resourceMarkers(sourceReq);

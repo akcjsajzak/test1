@@ -109,8 +109,20 @@ export interface ObservedRequest {
   nodeId?: string;
   /** normalized signature, filled by the normalizer. */
   normalized?: NormalizedRequest;
+  /** parsed GraphQL operation, when the request is a GraphQL call. */
+  graphql?: GraphqlOperation;
   /** true when the request left the configured scope and was flagged. */
   outOfScope?: boolean;
+}
+
+/** A parsed GraphQL operation attached to a request. */
+export interface GraphqlOperation {
+  operationType: 'query' | 'mutation' | 'subscription';
+  operationName?: string;
+  /** top-level (root) field names of the operation. */
+  rootFields: string[];
+  /** number of operation variables (a variable-bearing op is object-referencing). */
+  variableCount: number;
 }
 
 /** A node in the navigation/discovery graph: a distinct observed browser state. */

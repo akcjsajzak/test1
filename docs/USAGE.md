@@ -11,6 +11,7 @@ web-auth-auditor scan     --config config.yaml --output ./results   # full audit
 web-auth-auditor discover --config config.yaml --output ./results   # crawl + inventory only (no replay)
 web-auth-auditor compare  --config config.yaml --output ./results   # full scan, findings-focused output
 web-auth-auditor report   --input ./results/report.json --output .  # re-render HTML from a JSON report
+web-auth-auditor record-login --config config.yaml --out sessions.json  # script logins, capture cookies
 ```
 
 (When running from source without a global install, use `node dist/cli.js …`.)
@@ -56,6 +57,28 @@ web-auth-auditor scan --config config.yaml --output ./results
 The config references these as `${USER_A_SESSION}` etc. Extra HTTP headers
 (e.g. a bearer token in `Authorization`) are supported per user the same way.
 
+### Or script the login (recommended)
+
+Instead of extracting cookies by hand, give each user a `login` block (see
+[CONFIG.md](CONFIG.md)) and let the tool drive the login form:
+
+- During `scan`, the login runs automatically before crawling — the isolated
+  context keeps the session.
+- `record-login` runs the logins standalone and writes the captured cookies to a
+  file you can inspect or reuse (the file contains live secrets — don't commit it):
+
+```bash
+export ALICE_EMAIL=… ALICE_PASSWORD=…
+web-auth-auditor record-login --config config.yaml --out sessions.json
+```
+
+### GraphQL
+
+GraphQL is detected automatically: operations over a single `/graphql` URL are
+split into per-operation endpoints (by operation type + root field), variables
+are treated as object references, and queries are replayed across contexts as
+safe reads (mutations require `replay.allowDestructive`). No extra config needed.
+
 ## Proxy usage and limitations
 
 Configure a proxy under `proxy:` to route browser traffic through an intercepting
@@ -90,6 +113,10 @@ Documented limitations (Chromium/CDP):
 - **AUTHZ-IDOR-ENUM** *(opt-in via `idor.enabled`)* — the observing user could
   retrieve records it was never linked to by guessing sequential numeric ids;
   the endpoint enforces no per-object authorization.
+- **AUTHN-NO-AUTH** — an endpoint observed in authenticated contexts is served to
+  an *unauthenticated* identity (missing authentication check). Requires an
+  unauthenticated user (no cookies/headers) in the config; genuinely public
+  endpoints are not flagged.
 
 **Tenant-awareness.** When users declare a `tenant`, findings are tagged for
 triage: `cross-tenant` (one tenant reached another's resource — high signal),

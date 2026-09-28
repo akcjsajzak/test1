@@ -66,14 +66,29 @@ export class ReplayEngine implements Replayer {
     if (this.replaysUsed >= this.opts.spec.maxReplays) return { ok: false, reason: 'replay budget exhausted' };
     const method = request.method.toUpperCase();
     if (method === 'WEBSOCKET') return { ok: false, reason: 'websocket replay not supported' };
+
+    const scopeDecision = this.opts.scope.urlInScope(request.url);
+    if (!scopeDecision.allowed) return { ok: false, reason: `out of scope: ${scopeDecision.reason}` };
+
+    // GraphQL: queries are read-only (safe) even though they use POST; mutations
+    // and subscriptions are gated by allowDestructive.
+    if (request.graphql) {
+      if (request.graphql.operationType === 'query') {
+        if (!this.opts.spec.allowGraphqlQueries) return { ok: false, reason: 'graphql query replay disabled' };
+        return { ok: true };
+      }
+      if (!this.opts.spec.allowDestructive) {
+        return { ok: false, reason: `graphql ${request.graphql.operationType} skipped (allowDestructive is false)` };
+      }
+      return { ok: true };
+    }
+
     if (!this.opts.spec.allowedMethods.map((m) => m.toUpperCase()).includes(method)) {
       return { ok: false, reason: `method ${method} not in replay allow-list` };
     }
     if (MUTATING_METHODS.has(method) && !this.opts.spec.allowDestructive) {
       return { ok: false, reason: `mutating method ${method} skipped (allowDestructive is false)` };
     }
-    const scopeDecision = this.opts.scope.urlInScope(request.url);
-    if (!scopeDecision.allowed) return { ok: false, reason: `out of scope: ${scopeDecision.reason}` };
     return { ok: true };
   }
 
@@ -102,13 +117,23 @@ export class ReplayEngine implements Replayer {
 
     try {
       const headers = this.forwardableHeaders(request);
-      const resp = await ctx.fetch(request.url, {
-        method: base.method,
-        headers,
-        maxRedirects: 0,
-        timeout: 15000,
-        failOnStatusCode: false,
-      });
+      const method = base.method;
+      const options: {
+        method: string;
+        headers: Record<string, string>;
+        maxRedirects: number;
+        timeout: number;
+        failOnStatusCode: boolean;
+        data?: string;
+      } = { method, headers, maxRedirects: 0, timeout: 15000, failOnStatusCode: false };
+      // Forward the request body for body-bearing methods (needed for GraphQL,
+      // whose operation + variables live in the POST body).
+      if (method !== 'GET' && method !== 'HEAD' && request.requestBody) {
+        options.data = request.requestBody;
+        const hasCt = Object.keys(headers).some((k) => k.toLowerCase() === 'content-type');
+        if (!hasCt) headers['Content-Type'] = request.graphql ? 'application/json' : 'application/octet-stream';
+      }
+      const resp = await ctx.fetch(request.url, options);
       const status = resp.status();
       const respHeaders = resp.headers();
       let bodyText = '';

@@ -1,0 +1,42 @@
+# Scripted-login example against the enterprise fixture (test-app-enterprise/).
+#
+#   PORT=4200 npm run test:app:enterprise
+#   export ALICE_EMAIL=alice@acme.test ALICE_PASSWORD=password
+#   # capture cookies without scanning:
+#   node dist/cli.js record-login --config examples/login.yaml --out sessions.json
+#   # or just scan — the login runs automatically before the crawl:
+#   node dist/cli.js scan --config examples/login.yaml --output ./results
+
+authorizedTesting: true
+
+target:
+  url: "http://127.0.0.1:4200/"
+
+users:
+  - name: "alice"
+    role: "member"
+    privilegeLevel: 10
+    tenant: 1
+    login:
+      url: "http://127.0.0.1:4200/login"
+      steps:
+        - { fill: "#email", value: "${ALICE_EMAIL}" }
+        - { fill: "#password", value: "${ALICE_PASSWORD}" }
+        - { click: "#login-submit" }
+        - { waitForUrl: "/dashboard" }
+      successUrlIncludes: "/dashboard"
+
+  # An unauthenticated context enables the authentication-state analyzer.
+  - name: "anonymous"
+    role: "anonymous"
+    privilegeLevel: 0
+
+crawl:
+  maxDepth: 3
+  maxPages: 16
+  interact: false
+  settleMs: 150
+
+output:
+  dir: "./results"
+  formats: ["json", "html"]

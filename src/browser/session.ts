@@ -12,8 +12,15 @@ import type { BrowserContext, Page } from 'playwright-core';
 import type { Logger } from '../core/logger';
 import type { ScopeGuard } from '../core/scope';
 import type { ObservedRequest } from '../core/types';
-import type { UserSpec } from '../config/schema';
+import type { LoginSpec, LoginStep, UserSpec } from '../config/schema';
 import { NetworkCollector } from './network';
+
+export class LoginError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LoginError';
+  }
+}
 
 export interface UserSessionOptions {
   targetUrl: string;
@@ -132,6 +139,50 @@ export class UserSession {
     await this.collector.attach();
   }
 
+  /**
+   * Run a scripted login to obtain a session. Step values may contain secrets
+   * (passwords) injected from env vars; they are used to authenticate but never
+   * logged. The resulting session lives in this isolated context.
+   */
+  async login(spec: LoginSpec): Promise<void> {
+    const timeout = this.opts.navigationTimeoutMs;
+    const start = spec.url ?? this.opts.targetUrl;
+    await this.page.goto(start, { waitUntil: 'domcontentloaded' });
+    for (const step of spec.steps) {
+      await this.runLoginStep(step, timeout);
+    }
+    this.route = this.page.url();
+    if (spec.successUrlIncludes && !this.page.url().includes(spec.successUrlIncludes)) {
+      throw new LoginError(
+        `login for ${this.name} did not reach the expected URL (wanted a URL containing "${spec.successUrlIncludes}", got "${this.page.url()}")`,
+      );
+    }
+    this.opts.logger.info({ user: this.name, url: safeUrl(this.page.url()) }, 'login completed');
+  }
+
+  private async runLoginStep(step: LoginStep, timeout: number): Promise<void> {
+    const p = this.page;
+    try {
+      if (step.goto) await p.goto(step.goto, { waitUntil: 'domcontentloaded' });
+      if (step.fill) await p.fill(step.fill, step.value ?? '', { timeout });
+      if (step.type) await p.locator(step.type).pressSequentially(step.value ?? '', { timeout });
+      if (step.click) await p.click(step.click, { timeout });
+      if (step.press) await p.keyboard.press(step.press);
+      if (step.waitForSelector) await p.waitForSelector(step.waitForSelector, { timeout });
+      if (step.waitForUrl) await p.waitForURL((u) => u.href.includes(step.waitForUrl as string), { timeout });
+      if (step.waitFor) await p.waitForLoadState(step.waitFor, { timeout });
+      if (step.waitMs) await p.waitForTimeout(step.waitMs);
+    } catch (err) {
+      throw new LoginError(`login step failed for ${this.name}: ${describeStep(step)} — ${(err as Error).message}`);
+    }
+  }
+
+  /** Capture the current context's storage state (cookies + localStorage). */
+  async storageState(): Promise<{ cookies: Array<{ name: string; value: string; domain: string; path: string }> }> {
+    const state = await this.context.storageState();
+    return { cookies: state.cookies.map((c) => ({ name: c.name, value: c.value, domain: c.domain, path: c.path })) };
+  }
+
   /** Navigate the main page to a URL, tolerating benign navigation errors. */
   async goto(url: string): Promise<void> {
     try {
@@ -150,5 +201,28 @@ export class UserSession {
   async close(): Promise<void> {
     await this.flush();
     await this.context.close().catch(() => undefined);
+  }
+}
+
+/** Describe a login step without leaking its value (which may be a password). */
+function describeStep(step: LoginStep): string {
+  if (step.goto) return `goto ${step.goto}`;
+  if (step.fill) return `fill ${step.fill}`;
+  if (step.type) return `type into ${step.type}`;
+  if (step.click) return `click ${step.click}`;
+  if (step.press) return `press ${step.press}`;
+  if (step.waitForSelector) return `waitForSelector ${step.waitForSelector}`;
+  if (step.waitForUrl) return `waitForUrl ${step.waitForUrl}`;
+  if (step.waitFor) return `waitFor ${step.waitFor}`;
+  if (step.waitMs) return `waitMs ${step.waitMs}`;
+  return '(no-op step)';
+}
+
+function safeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return '[url]';
   }
 }

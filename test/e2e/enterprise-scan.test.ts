@@ -85,6 +85,15 @@ describe('end-to-end scan against the complex multi-tenant fixture (Acme Cloud)'
       // ── Active enumeration analyzer: an open numeric-id endpoint is sweepable ─
       expect(anyFinding(findings, (x) => x.type === 'AUTHZ-IDOR-ENUM' && /(users|tickets)/.test(x.normalizedRoute ?? ''))).toBe(true);
 
+      // ── GraphQL: per-operation authz over a single /graphql URL ──────────────
+      expect(anyFinding(findings, (x) => x.type === 'AUTHZ-HORIZONTAL' && /GRAPHQL query ticket/.test(x.normalizedRoute ?? ''))).toBe(true);
+      expect(anyFinding(findings, (x) => x.type === 'AUTHZ-VERTICAL' && /GRAPHQL query adminMetrics/.test(x.normalizedRoute ?? ''))).toBe(true);
+      // the securely-checked GraphQL operation must NOT be flagged
+      expect(anyFinding(findings, (x) => /GRAPHQL query secureTicket/.test(x.normalizedRoute ?? ''))).toBe(false);
+
+      // ── Authentication-state analyzer: an endpoint reachable with no session ─
+      expect(anyFinding(findings, (x) => x.type === 'AUTHN-NO-AUTH' && (x.tags ?? []).includes('no-auth') && /feature-flags/.test(x.url ?? ''))).toBe(true);
+
       // ── Tenant-awareness: cross-tenant elevated+tagged; same-tenant access to a
       //    tenant-scoped resource downgraded to info (likely legitimate sharing) ─
       expect(anyFinding(findings, (x) => (x.tags ?? []).includes('cross-tenant') && x.severity === 'high')).toBe(true);
@@ -97,8 +106,10 @@ describe('end-to-end scan against the complex multi-tenant fixture (Acme Cloud)'
       expect(urlRe(findings, /\/api\/orgs\/\d+\/billing\/summary/)).toBe(false);
       expect(urlRe(findings, /\/api\/admin\/orgs(\b|$)/)).toBe(false);
       expect(urlRe(findings, /\/api\/tickets\/\d+\/secure/)).toBe(false);
-      // The mutating admin op must never be replayed by default.
-      expect(anyFinding(findings, (x) => (x.method ?? '') !== 'GET')).toBe(false);
+      // Mutating operations must never be replayed by default (GraphQL *queries*
+      // are POST but read-only and legitimately appear).
+      expect(urlRe(findings, /\/suspend/)).toBe(false);
+      expect(anyFinding(findings, (x) => /GRAPHQL mutation|GRAPHQL subscription/.test(x.normalizedRoute ?? ''))).toBe(false);
 
       // ── Scale sanity + reports ───────────────────────────────────────────────
       expect(findings.length).toBeGreaterThan(15);

@@ -31,6 +31,8 @@ export interface UserInfo {
   privilegeLevel?: number;
   /** optional tenant/org identifier for cross-tenant reasoning. */
   tenant?: string;
+  /** whether this context carries authentication material (cookies/headers/login). */
+  authenticated?: boolean;
 }
 
 /** Everything an analyzer needs, without depending on concrete engine classes. */

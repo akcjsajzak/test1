@@ -51,6 +51,19 @@ Privilege tiers: `anonymous(0) < member(10) < manager(50) < org_admin(80) < supe
 | — | `GET /api/search` | public, identical for everyone |
 | — | `POST /api/admin/orgs/:orgId/suspend` | mutating — never replayed by default |
 
+**GraphQL** (`POST /graphql`, per-operation authorization):
+
+| Operation | Behavior | Auditor should |
+| --- | --- | --- |
+| `query ticket(id)` | IDOR — any ticket | **flag horizontal** |
+| `query secureTicket(id)` | owner/super-admin only | not flag (true negative) |
+| `query adminMetrics` | no role check | **flag vertical** (and no-auth for anonymous) |
+| `query me` | per-user | not flag |
+
+**Form login** (`POST /api/login`, `/login` page) lets the login recorder script
+authentication (`fill #email/#password`, click `#login-submit`) with the fixed
+password `password`.
+
 ## SPA characteristics exercised
 
 - Client-side **pushState router** with parameterized + nested routes.

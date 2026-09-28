@@ -28,7 +28,11 @@ export { ReplayEngine } from './analysis/replay';
 export { HorizontalAnalyzer } from './analysis/horizontal';
 export { VerticalAnalyzer } from './analysis/vertical';
 export { IdorEnumerationAnalyzer } from './analysis/idor';
+export { AuthStateAnalyzer } from './analysis/authstate';
+export { detectGraphql, graphqlSignature, extractRootFields } from './analysis/graphql';
 export { runScan, AuthorizationError, type ScanOptions, type ScanOutcome } from './orchestrator/scan';
+export { recordLogins, type RecordedSession } from './orchestrator/record-login';
+export { LoginError } from './browser/session';
 export {
   writeReports,
   buildJsonReport,

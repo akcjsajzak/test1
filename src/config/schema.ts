@@ -23,6 +23,29 @@ export const headerSchema = z.object({
   value: z.string(),
 });
 
+/** A single scripted login step (at least one action key should be set). */
+export const loginStepSchema = z.object({
+  goto: z.string().optional(), // navigate to a URL
+  fill: z.string().optional(), // selector to fill
+  type: z.string().optional(), // selector to type into (char by char)
+  value: z.string().optional(), // value for fill/type (supports ${ENV})
+  click: z.string().optional(), // selector to click
+  press: z.string().optional(), // key to press (e.g. "Enter")
+  waitFor: z.enum(['load', 'domcontentloaded', 'networkidle']).optional(),
+  waitForSelector: z.string().optional(),
+  waitForUrl: z.string().optional(), // substring the URL should contain
+  waitMs: z.number().int().min(0).optional(),
+});
+
+/** Scripted login used to obtain a session instead of pasting cookies. */
+export const loginSchema = z.object({
+  /** login page to open first (defaults to the target URL). */
+  url: z.string().optional(),
+  steps: z.array(loginStepSchema).default([]),
+  /** after the steps, assert the resulting URL contains this (sanity check). */
+  successUrlIncludes: z.string().optional(),
+});
+
 export const userSchema = z.object({
   /** logical identifier, e.g. user_a, admin. */
   name: z.string().min(1),
@@ -43,6 +66,8 @@ export const userSchema = z.object({
   headers: z.array(headerSchema).default([]),
   /** localStorage entries to seed into the isolated context (origin-scoped). */
   localStorage: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+  /** optional scripted login to obtain a session for this user. */
+  login: loginSchema.optional(),
 });
 
 export const proxySchema = z.object({
@@ -108,6 +133,8 @@ export const replaySchema = z.object({
   allowedMethods: z.array(z.string()).default(['GET', 'HEAD', 'OPTIONS']),
   /** allow replay of mutating methods (POST/PUT/PATCH/DELETE). Default false. */
   allowDestructive: z.boolean().default(false),
+  /** allow replaying GraphQL *queries* (POST, but read-only) as safe. */
+  allowGraphqlQueries: z.boolean().default(true),
   maxReplays: z.number().int().positive().default(500),
 });
 
@@ -196,6 +223,8 @@ export const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>;
 export type UserSpec = z.infer<typeof userSchema>;
+export type LoginSpec = z.infer<typeof loginSchema>;
+export type LoginStep = z.infer<typeof loginStepSchema>;
 export type CookieSpec = z.infer<typeof cookieSchema>;
 export type ProxySpec = z.infer<typeof proxySchema>;
 export type ScopeSpec = z.infer<typeof scopeSchema>;

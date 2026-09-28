@@ -126,6 +126,18 @@ function createApp() {
 
   const auth = (req, res, next) => (req.user ? next() : res.status(401).json(envelope({ error: 'unauthorized' })));
 
+  // ── Form login (for the login-recorder demo) ────────────────────────────────
+  const EMAIL_TO_TOKEN = {};
+  for (const [token, uid] of Object.entries(TOKENS)) EMAIL_TO_TOKEN[USERS[uid].email.toLowerCase()] = token;
+  app.post('/api/login', (req, res) => {
+    const email = String((req.body && req.body.email) || '').toLowerCase();
+    const password = (req.body && req.body.password) || '';
+    const token = EMAIL_TO_TOKEN[email];
+    if (!token || password !== 'password') return res.status(401).json(envelope({ error: 'invalid_credentials' }));
+    res.cookie('session', token, { httpOnly: true, sameSite: 'lax', path: '/' });
+    res.json(envelope({ ok: true, user: USERS[TOKENS[token]].name }));
+  });
+
   // ── Identity ──────────────────────────────────────────────────────────────
   app.get('/api/me', auth, (req, res) => {
     const u = req.user;
@@ -268,9 +280,43 @@ function createApp() {
     req.on('close', () => clearInterval(timer));
   });
 
+  // ── GraphQL endpoint (tiny hand-rolled resolver) ────────────────────────────
+  // All operations share this URL; authorization is per-operation, so it mirrors
+  // the REST vuln matrix: ticket = IDOR, secureTicket = enforced, adminMetrics =
+  // missing role check, me = per-user.
+  app.post('/graphql', (req, res) => {
+    const query = (req.body && req.body.query) || '';
+    const vars = (req.body && req.body.variables) || {};
+    const user = req.user;
+    const ext = { extensions: { requestId: crypto.randomUUID() } };
+    const has = (name) => new RegExp('\\b' + name + '\\b').test(query);
+
+    if (has('adminMetrics')) {
+      // VULN (vertical): no role check.
+      return res.json({ data: { adminMetrics: { orgs: Object.keys(ORGS).length, users: Object.keys(USERS).length, mrr: 42000 } }, ...ext });
+    }
+    if (has('secureTicket')) {
+      if (!user) return res.json({ errors: [{ message: 'unauthorized' }], ...ext });
+      const t = TICKETS[vars.id];
+      if (!t) return res.json({ data: { secureTicket: null }, ...ext });
+      if (t.ownerId !== user.id && user.role !== 'super_admin') return res.json({ errors: [{ message: 'forbidden' }], ...ext });
+      return res.json({ data: { secureTicket: t }, ...ext });
+    }
+    if (has('ticket')) {
+      if (!user) return res.json({ errors: [{ message: 'unauthorized' }], ...ext });
+      const t = TICKETS[vars.id];
+      return res.json({ data: { ticket: t || null }, ...ext }); // VULN (IDOR): no ownership check
+    }
+    if (has('me')) {
+      if (!user) return res.json({ errors: [{ message: 'unauthorized' }], ...ext });
+      return res.json({ data: { me: { id: user.id, name: user.name, role: user.role } }, ...ext });
+    }
+    return res.json({ errors: [{ message: 'unknown operation' }], ...ext });
+  });
+
   // ── Static SPA + deep-link fallback ─────────────────────────────────────────
   app.use('/', express.static(path.join(__dirname, 'public')));
-  app.get(/^\/(dashboard|projects|tickets|invoices|users|admin|documents|settings|search).*/, (_req, res) => {
+  app.get(/^\/(dashboard|projects|tickets|invoices|users|admin|documents|settings|search|login).*/, (_req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
 
