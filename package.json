@@ -1,0 +1,54 @@
+{
+  "name": "web-auth-auditor",
+  "version": "0.1.0",
+  "description": "Authorized authorization/access-control auditor for web applications (horizontal & vertical authz testing) using Chromium via CDP.",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "web-auth-auditor": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "dev": "tsx src/cli.ts",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e --testTimeout=120000",
+    "test:app": "node test-app/server.js",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0",
+    "pino": "^9.5.0",
+    "playwright-core": "^1.49.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^8.57.1",
+    "express": "^4.21.1",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
