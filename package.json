@@ -30,6 +30,7 @@
     "test:e2e": "vitest run test/e2e --testTimeout=240000",
     "test:app": "node test-app/server.js",
     "test:app:enterprise": "node test-app-enterprise/server.js",
+    "test:app:atlas": "node test-app-atlas/server.js",
     "prepare": "npm run build"
   },
   "dependencies": {

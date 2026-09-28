@@ -1,0 +1,23 @@
+:root { color-scheme: light dark; --bg:#fff; --fg:#111; --muted:#666; --line:#0002; --accent:#0369a1; --card:#f5f7fa; }
+@media (prefers-color-scheme: dark){ :root{ --bg:#0e1116; --fg:#e7eaee; --muted:#98a2b3; --line:#fff2; --accent:#38bdf8; --card:#171b22; } }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+#shell { display: flex; min-height: 100vh; }
+#sidebar { width: 210px; border-right: 1px solid var(--line); padding: 1rem .7rem; display: flex; flex-direction: column; gap: .15rem; overflow:auto; }
+.brand { font-weight: 700; margin-bottom: .8rem; }
+.nav-group { font-size: .68rem; letter-spacing: .08em; color: var(--muted); margin: .7rem 0 .2rem; }
+.nav-item { display: block; padding: .28rem .5rem; border-radius: 6px; text-decoration: none; color: var(--fg); font-size: .88rem; }
+.nav-item:hover { background: var(--card); }
+#content { flex: 1; min-width: 0; }
+#topbar { display: flex; justify-content: space-between; align-items: center; padding: .6rem 1.2rem; border-bottom: 1px solid var(--line); }
+#crumbs { color: var(--muted); font-family: ui-monospace, monospace; font-size: .85rem; }
+.whoami { font-size: .88rem; }
+main { padding: 1.2rem; max-width: 880px; }
+h1 { font-size: 1.35rem; margin: .2rem 0 1rem; }
+h3 { margin: .2rem 0; font-size: .95rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin: .6rem 0; }
+pre { background: #0001; padding: .7rem; border-radius: 6px; overflow: auto; font-size: .8rem; }
+.list { list-style: none; padding: 0; } .list li { padding: .3rem 0; border-bottom: 1px solid var(--line); }
+a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+input { font: inherit; padding: .35rem .6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); display:block; margin:.3rem 0; min-width:240px; }
+button { font: inherit; padding: .4rem .8rem; border: 1px solid var(--line); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }

@@ -60,8 +60,13 @@ export class IdorEnumerationAnalyzer implements Analyzer {
 
         const probed = await this.probeEndpoint(ctx, cfg, inv.user, base, target, state);
         if (probed.sawDenial) enforcingSignatures.add(signature);
-        if (probed.accessed.length > 0) {
-          candidates.push({ user: inv.user, signature, base, target, ...probed });
+        // Only count ids the user was never shown: if the record already appears
+        // in the collection list they legitimately received, id-guessing it is not
+        // a leak (it's an authorized, fully-listed collection).
+        const shown = this.shownIds(ctx, inv.user, base);
+        const accessed = probed.accessed.filter((a) => !shown.has(String(a.id)));
+        if (accessed.length > 0) {
+          candidates.push({ user: inv.user, signature, base, target, ...probed, accessed });
         }
       }
     }
@@ -114,6 +119,28 @@ export class IdorEnumerationAnalyzer implements Analyzer {
       }
     }
     return { accessed, sawDenial, neighbors };
+  }
+
+  /**
+   * The set of object ids the user was legitimately shown for this resource,
+   * read from the collection-list response for the same path (the detail
+   * template minus its id segment). Used to avoid flagging records already
+   * listed to the user.
+   */
+  private shownIds(ctx: AnalysisContext, user: string, base: ObservedRequest): Set<string> {
+    const set = new Set<string>();
+    if (!base.normalized) return set;
+    const collectionTemplate = base.normalized.pathTemplate.replace(/\/[^/]+$/, '');
+    if (!collectionTemplate) return set;
+    const collectionSig = `${base.method.toUpperCase()} ${base.normalized.host}${collectionTemplate}`;
+    const obs = ctx.inventory.getUser(user)?.endpoints.get(collectionSig);
+    if (!obs) return set;
+    const rep = pickRepresentative(ctx.requestsById, obs.requestIds);
+    if (!rep?.responseBody) return set;
+    for (const m of rep.responseBody.matchAll(/"id"\s*:\s*(?:"([^"]+)"|(\d+))/g)) {
+      set.add(m[1] ?? m[2]);
+    }
+    return set;
   }
 
   private buildFinding(ctx: AnalysisContext, c: Candidate): Finding {

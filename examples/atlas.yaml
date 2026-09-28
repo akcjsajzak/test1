@@ -1,0 +1,47 @@
+# Config for the 5×5 role-matrix fixture (test-app-atlas/, "Atlas ERP").
+#
+#   PORT=4300 npm run test:app:atlas
+#   export T_FV=tok_finance_viewer T_FD=tok_finance_director T_SV=tok_sales_viewer \
+#          T_PA=tok_procurement_approver T_HV=tok_hr_viewer T_HM=tok_hr_manager \
+#          T_IV=tok_it_viewer T_AD=tok_admin
+#   node dist/cli.js scan --config examples/atlas.yaml --output ./results
+#
+# This tests a representative subset of the 25-role matrix. To test the FULL
+# matrix, add every `tok_<dept>_<level>` (dept in sales/procurement/finance/hr/it,
+# level in viewer/contributor/approver/manager/director) as its own user with
+# tenant: <dept> and privilegeLevel: <level*10>.
+
+authorizedTesting: true
+
+target:
+  url: "http://127.0.0.1:4300/"
+
+# tenant = department (cross-department access is elevated + tagged cross-tenant);
+# privilegeLevel = authority level × 10 (drives within-department vertical checks).
+users:
+  - { name: "finance_viewer",       role: "finance_viewer",       tenant: finance,     privilegeLevel: 10,  cookies: [{ name: "session", value: "${T_FV}" }] }
+  - { name: "finance_director",     role: "finance_director",     tenant: finance,     privilegeLevel: 50,  cookies: [{ name: "session", value: "${T_FD}" }] }
+  - { name: "sales_viewer",         role: "sales_viewer",         tenant: sales,       privilegeLevel: 10,  cookies: [{ name: "session", value: "${T_SV}" }] }
+  - { name: "procurement_approver", role: "procurement_approver", tenant: procurement, privilegeLevel: 30,  cookies: [{ name: "session", value: "${T_PA}" }] }
+  - { name: "hr_viewer",            role: "hr_viewer",            tenant: hr,          privilegeLevel: 10,  cookies: [{ name: "session", value: "${T_HV}" }] }
+  - { name: "hr_manager",           role: "hr_manager",           tenant: hr,          privilegeLevel: 40,  cookies: [{ name: "session", value: "${T_HM}" }] }
+  - { name: "it_viewer",            role: "it_viewer",            tenant: it,          privilegeLevel: 10,  cookies: [{ name: "session", value: "${T_IV}" }] }
+  - { name: "admin",                role: "admin",                privilegeLevel: 100,                      cookies: [{ name: "session", value: "${T_AD}" }] }
+  - { name: "anonymous",            role: "anonymous",            privilegeLevel: 0 }
+
+crawl:
+  maxDepth: 4
+  maxPages: 24
+  interact: false
+  settleMs: 100
+
+scope:
+  requestsPerSecond: 40
+
+idor:
+  enabled: true
+  numericNeighbors: 3
+
+output:
+  dir: "./results"
+  formats: ["json", "html"]

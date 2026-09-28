@@ -113,9 +113,11 @@ constructed requests (bounded, safe GET only) beyond what was observed.
 | `maxTotalProbes` | `200` | Global cap on enumeration probes. |
 
 The analyzer probes sequential numeric ids under the observing user's own
-session, filters empty/absent responses via a sentinel probe, and suppresses
-endpoints that deny any id (they enforce object-level authorization). It reports
-one aggregated finding per `(user, endpoint)`.
+session, filters empty/absent responses via a sentinel probe, ignores ids the
+user was already shown in the collection list (so a fully-listed, authorized
+collection is not flagged), and suppresses endpoints that deny any id (they
+enforce object-level authorization). It reports one aggregated finding per
+`(user, endpoint)`.
 
 ## `compare`
 

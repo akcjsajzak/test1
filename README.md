@@ -59,18 +59,25 @@ or an inline `login` block).
 
 ## Test fixtures
 
-Two deliberately-vulnerable apps back the automated tests:
+Three deliberately-vulnerable apps back the automated tests:
 
 - [`test-app/`](test-app/README.md) — a compact SPA covering the core horizontal,
   vertical and mistaken-exposure cases.
 - [`test-app-enterprise/`](test-app-enterprise/README.md) — **Acme Cloud**, a
   realistic multi-tenant SaaS (4 privilege tiers, nested resources, numeric/UUID/
-  slug ids, pagination, SSE and WebSocket) with a full matrix of broken and
-  correct access controls. The end-to-end test scans it and asserts every planted
-  issue is found and every secured endpoint is not.
+  slug ids, pagination, SSE, WebSocket, GraphQL, form login) with a full matrix of
+  broken and correct access controls.
+- [`test-app-atlas/`](test-app-atlas/README.md) — **Atlas ERP**, a business-ops
+  suite with a **5×5 role matrix** (5 departments × 5 authority levels = 25 roles
+  + a global admin). Cross-department leaks, within-department privilege
+  escalation, enumeration IDOR, admin gaps and GraphQL — with most cells correctly
+  enforced as true negatives.
+
+Each end-to-end test scans its fixture and asserts every planted issue is found
+and every correctly-enforced endpoint is not.
 
 ```bash
-npm test          # unit + integration + both end-to-end scans
+npm test          # unit + integration + all three end-to-end scans
 ```
 
 ## License
