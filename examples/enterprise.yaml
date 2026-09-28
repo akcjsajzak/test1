@@ -10,11 +10,12 @@ target:
   url: "http://127.0.0.1:4200/"
 
 users:
-  - { name: "alice",     role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${ALICE}" }] }
-  - { name: "bob",       role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${BOB}" }] }
-  - { name: "mallory",   role: "member",      privilegeLevel: 10,  cookies: [{ name: "session", value: "${MALLORY}" }] }  # different tenant
-  - { name: "admin1",    role: "org_admin",   privilegeLevel: 80,  cookies: [{ name: "session", value: "${ADMIN}" }] }
-  - { name: "root",      role: "super_admin", privilegeLevel: 120, cookies: [{ name: "session", value: "${ROOT}" }] }
+  # `tenant` enables cross-tenant reasoning: Mallory is in tenant 2, the rest in 1.
+  - { name: "alice",     role: "member",      privilegeLevel: 10,  tenant: 1, cookies: [{ name: "session", value: "${ALICE}" }] }
+  - { name: "bob",       role: "member",      privilegeLevel: 10,  tenant: 1, cookies: [{ name: "session", value: "${BOB}" }] }
+  - { name: "mallory",   role: "member",      privilegeLevel: 10,  tenant: 2, cookies: [{ name: "session", value: "${MALLORY}" }] }
+  - { name: "admin1",    role: "org_admin",   privilegeLevel: 80,  tenant: 1, cookies: [{ name: "session", value: "${ADMIN}" }] }
+  - { name: "root",      role: "super_admin", privilegeLevel: 120, tenant: 1, cookies: [{ name: "session", value: "${ROOT}" }] }
   - { name: "anonymous", role: "anonymous",   privilegeLevel: 0 }
 
 crawl:
@@ -28,6 +29,12 @@ crawl:
 
 scope:
   requestsPerSecond: 40
+
+# Opt-in active enumeration: probe sequential numeric ids to find records
+# reachable by guessing (endpoints that enforce authz on any id are suppressed).
+idor:
+  enabled: true
+  numericNeighbors: 2
 
 output:
   dir: "./results"

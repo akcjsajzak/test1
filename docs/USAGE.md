@@ -87,6 +87,17 @@ Documented limitations (Chromium/CDP):
   capability observed in a higher-privilege context, with no denial. `high` when
   the path is clearly privileged (`/admin`, `/internal`, …) or the tester is
   anonymous.
+- **AUTHZ-IDOR-ENUM** *(opt-in via `idor.enabled`)* — the observing user could
+  retrieve records it was never linked to by guessing sequential numeric ids;
+  the endpoint enforces no per-object authorization.
+
+**Tenant-awareness.** When users declare a `tenant`, findings are tagged for
+triage: `cross-tenant` (one tenant reached another's resource — high signal),
+`same-tenant-shared` (a peer reached a tenant-scoped resource of their own
+tenant — downgraded to `info` as likely-legitimate sharing), and `same-tenant`
+(a peer reached another user's *per-user* resource — still a real finding).
+Filter the report by tag to separate genuine cross-tenant breaches from expected
+intra-tenant sharing.
 
 Findings are sorted most-severe first, with graded confidence (`info`/`low`/
 `medium`/`high`). Denials, login redirects, per-user content differences and

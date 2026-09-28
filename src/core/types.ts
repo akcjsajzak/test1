@@ -255,6 +255,8 @@ export interface Finding {
   comparisonResponse?: ResponseSnapshot;
   diff?: ResponseDiff;
   evidence: Evidence[];
+  /** machine-filterable labels, e.g. 'cross-tenant', 'same-tenant', 'enumeration'. */
+  tags?: string[];
   timestamp: number;
 }
 

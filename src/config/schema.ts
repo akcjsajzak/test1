@@ -33,6 +33,12 @@ export const userSchema = z.object({
    * to know which contexts should be "less privileged". anonymous=0.
    */
   privilegeLevel: z.number().int().min(0).optional(),
+  /**
+   * Optional tenant/org identifier. When set on the users involved, the
+   * horizontal analyzer elevates cross-tenant access and de-prioritizes
+   * same-tenant access to tenant-scoped resources (likely legitimate sharing).
+   */
+  tenant: z.union([z.string(), z.number()]).optional(),
   cookies: z.array(cookieSchema).default([]),
   headers: z.array(headerSchema).default([]),
   /** localStorage entries to seed into the isolated context (origin-scoped). */
@@ -105,6 +111,20 @@ export const replaySchema = z.object({
   maxReplays: z.number().int().positive().default(500),
 });
 
+export const idorSchema = z.object({
+  /**
+   * Active IDOR / enumeration probing. Off by default because it issues new
+   * (constructed) requests beyond what was observed; enable it deliberately.
+   */
+  enabled: z.boolean().default(false),
+  /** probe id-n .. id+n around each observed numeric id. */
+  numericNeighbors: z.number().int().min(0).default(3),
+  /** cap probes per endpoint template. */
+  maxProbesPerEndpoint: z.number().int().positive().default(8),
+  /** global cap on enumeration probes across the scan. */
+  maxTotalProbes: z.number().int().positive().default(200),
+});
+
 export const compareSchema = z.object({
   /** JSON field names ignored when diffing (dynamic values). */
   ignoreFields: z.array(z.string()).default([
@@ -168,6 +188,7 @@ export const configSchema = z.object({
   scope: scopeSchema.default({}),
   crawl: crawlSchema.default({}),
   replay: replaySchema.default({}),
+  idor: idorSchema.default({}),
   compare: compareSchema.default({}),
   browser: browserSchema.default({}),
   output: outputSchema.default({}),
@@ -180,6 +201,7 @@ export type ProxySpec = z.infer<typeof proxySchema>;
 export type ScopeSpec = z.infer<typeof scopeSchema>;
 export type CrawlSpec = z.infer<typeof crawlSchema>;
 export type ReplaySpec = z.infer<typeof replaySchema>;
+export type IdorSpec = z.infer<typeof idorSchema>;
 export type CompareSpec = z.infer<typeof compareSchema>;
 export type BrowserSpec = z.infer<typeof browserSchema>;
 export type OutputSpec = z.infer<typeof outputSchema>;

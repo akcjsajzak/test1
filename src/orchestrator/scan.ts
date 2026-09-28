@@ -30,6 +30,7 @@ import { ReplayEngine } from '../analysis/replay';
 import { AnalyzerRegistry, type AnalysisContext } from '../analysis/engine';
 import { HorizontalAnalyzer } from '../analysis/horizontal';
 import { VerticalAnalyzer } from '../analysis/vertical';
+import { IdorEnumerationAnalyzer } from '../analysis/idor';
 import { writeReports, type ReportBundle, type InventoryReportEntry } from '../report';
 
 export class AuthorizationError extends Error {
@@ -144,14 +145,22 @@ export async function runScan(opts: ScanOptions): Promise<ScanOutcome> {
 
     // 4. Analysis (controlled replay + comparison).
     if (analyze) {
-      const registry = new AnalyzerRegistry().register(new HorizontalAnalyzer()).register(new VerticalAnalyzer());
+      const registry = new AnalyzerRegistry()
+        .register(new HorizontalAnalyzer())
+        .register(new VerticalAnalyzer())
+        .register(new IdorEnumerationAnalyzer()); // no-ops unless config.idor.enabled
       for (const extra of opts.extraAnalyzers?.list() ?? []) registry.register(extra);
       const ctx: AnalysisContext = {
         config,
         inventory,
         requestsById,
         graphs,
-        users: config.users.map((u) => ({ name: u.name, role: u.role, privilegeLevel: u.privilegeLevel })),
+        users: config.users.map((u) => ({
+          name: u.name,
+          role: u.role,
+          privilegeLevel: u.privilegeLevel,
+          tenant: u.tenant === undefined ? undefined : String(u.tenant),
+        })),
         replayer: replayEngine,
         scope,
         logger,
@@ -245,6 +254,7 @@ function buildConfigEcho(config: Config): Record<string, unknown> {
       name: u.name,
       role: u.role,
       privilegeLevel: u.privilegeLevel,
+      tenant: u.tenant,
       cookieCount: u.cookies.length,
       headerCount: u.headers.length,
     })),
@@ -258,6 +268,7 @@ function buildConfigEcho(config: Config): Record<string, unknown> {
     },
     crawl: config.crawl,
     replay: config.replay,
+    idor: config.idor,
     proxy: config.proxy ? { type: config.proxy.type, server: maskProxy(config.proxy.url) } : null,
   };
 }

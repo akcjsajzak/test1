@@ -56,10 +56,13 @@ isolation and new detection engines can be added without touching the core.
    rule-based templating plus a stateful pass that only collapses
    identifier-like segments (REST collection names are preserved).
 6. **Inventory** groups normalized requests per user.
-7. **AuthZ Engine** runs the registered analyzers. Each uses the **Replay
-   Engine** (safe-by-default, secret-free, scoped) and the **Comparator**
-   (content-type-aware, dynamic-field-ignoring, denial-detecting) to decide
-   findings with graded confidence.
+7. **AuthZ Engine** runs the registered analyzers — **horizontal** (object-level
+   / IDOR, tenant-aware), **vertical** (privilege escalation) and, opt-in, an
+   **active IDOR enumeration** sweep. Each uses the **Replay Engine**
+   (safe-by-default, secret-free, scoped) and the **Comparator** (content-type-
+   aware, dynamic-field-ignoring, denial-detecting) to decide findings with
+   graded confidence. When users declare a `tenant`, cross-tenant access is
+   elevated and same-tenant sharing of tenant-scoped resources de-prioritized.
 8. **Reporter** emits `report.json` (machine-readable) and `report.html`
    (human-readable), each finding carrying evidence and redacted request/response
    snapshots.

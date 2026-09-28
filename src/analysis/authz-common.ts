@@ -66,6 +66,32 @@ export function privilegeOf(info: UserInfo): number {
   return 10;
 }
 
+/** Path segments that introduce a tenant/org scope. */
+const TENANT_COLLECTIONS = new Set([
+  'orgs', 'org', 'organizations', 'organisation', 'organisations',
+  'tenants', 'tenant', 'accounts', 'account', 'workspaces', 'workspace',
+  'companies', 'company', 'teams', 'team', 'customers', 'customer',
+]);
+
+/**
+ * Whether a URL is scoped to a given tenant, i.e. its path contains a
+ * tenant-collection segment immediately followed by that tenant's id
+ * (e.g. tenant "1" matches /api/orgs/1/projects but NOT /api/users/1).
+ * The collection prefix avoids mistaking a per-user object id for a tenant id.
+ */
+export function resourceTenantScoped(url: string, tenant: string): boolean {
+  let segs: string[];
+  try {
+    segs = new URL(url).pathname.split('/').filter(Boolean);
+  } catch {
+    return false;
+  }
+  for (let i = 0; i < segs.length - 1; i++) {
+    if (TENANT_COLLECTIONS.has(segs[i].toLowerCase()) && segs[i + 1] === tenant) return true;
+  }
+  return false;
+}
+
 export function isPrivilegedPath(pathOrUrl: string): boolean {
   let path = pathOrUrl;
   try {

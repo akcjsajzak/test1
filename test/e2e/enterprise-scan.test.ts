@@ -36,17 +36,18 @@ describe('end-to-end scan against the complex multi-tenant fixture (Acme Cloud)'
         authorizedTesting: true,
         target: { url: baseUrl },
         users: [
-          { name: 'alice', role: 'member', privilegeLevel: 10, cookies: [{ name: 'session', value: 'tok_alice' }] },
-          { name: 'bob', role: 'member', privilegeLevel: 10, cookies: [{ name: 'session', value: 'tok_bob' }] },
-          { name: 'mallory', role: 'member', privilegeLevel: 10, cookies: [{ name: 'session', value: 'tok_mallory' }] },
-          { name: 'admin1', role: 'org_admin', privilegeLevel: 80, cookies: [{ name: 'session', value: 'tok_admin' }] },
-          { name: 'root', role: 'super_admin', privilegeLevel: 120, cookies: [{ name: 'session', value: 'tok_root' }] },
+          { name: 'alice', role: 'member', privilegeLevel: 10, tenant: 1, cookies: [{ name: 'session', value: 'tok_alice' }] },
+          { name: 'bob', role: 'member', privilegeLevel: 10, tenant: 1, cookies: [{ name: 'session', value: 'tok_bob' }] },
+          { name: 'mallory', role: 'member', privilegeLevel: 10, tenant: 2, cookies: [{ name: 'session', value: 'tok_mallory' }] },
+          { name: 'admin1', role: 'org_admin', privilegeLevel: 80, tenant: 1, cookies: [{ name: 'session', value: 'tok_admin' }] },
+          { name: 'root', role: 'super_admin', privilegeLevel: 120, tenant: 1, cookies: [{ name: 'session', value: 'tok_root' }] },
           { name: 'anonymous', role: 'anonymous', privilegeLevel: 0 },
         ],
         // Navigation-only crawl keeps the e2e fast and deterministic; each route
         // auto-fetches its data, so the whole API surface is still observed.
         crawl: { maxDepth: 4, maxPages: 16, interact: false, settleMs: 100 },
         scope: { requestsPerSecond: 40 },
+        idor: { enabled: true, numericNeighbors: 2 },
         output: { dir: outDir, formats: ['json', 'html'] },
       });
 
@@ -80,6 +81,16 @@ describe('end-to-end scan against the complex multi-tenant fixture (Acme Cloud)'
       expect(urlRe(findings, /\/api\/orgs\/\d+\/export/)).toBe(true); // function-level export
       // Mistaken exposure reachable anonymously, discovered via a background fetch.
       expect(anyFinding(findings, (x) => x.testUser === 'anonymous' && /\/api\/admin\/feature-flags/.test(x.url ?? ''))).toBe(true);
+
+      // ── Active enumeration analyzer: an open numeric-id endpoint is sweepable ─
+      expect(anyFinding(findings, (x) => x.type === 'AUTHZ-IDOR-ENUM' && /(users|tickets)/.test(x.normalizedRoute ?? ''))).toBe(true);
+
+      // ── Tenant-awareness: cross-tenant elevated+tagged; same-tenant access to a
+      //    tenant-scoped resource downgraded to info (likely legitimate sharing) ─
+      expect(anyFinding(findings, (x) => (x.tags ?? []).includes('cross-tenant') && x.severity === 'high')).toBe(true);
+      expect(anyFinding(findings, (x) => (x.tags ?? []).includes('same-tenant-shared') && x.severity === 'info')).toBe(true);
+      // A same-tenant per-user resource (ticket/PII) is NOT downgraded.
+      expect(anyFinding(findings, (x) => (x.tags ?? []).includes('same-tenant') && x.severity === 'high')).toBe(true);
 
       // ── True negatives: correctly-secured endpoints must NOT be flagged ──────
       expect(urlRe(findings, /\/api\/users\/\d+\/secure/)).toBe(false);

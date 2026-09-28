@@ -27,6 +27,7 @@ export { classifyInteraction, shouldTrigger } from './crawler/interactions';
 export { ReplayEngine } from './analysis/replay';
 export { HorizontalAnalyzer } from './analysis/horizontal';
 export { VerticalAnalyzer } from './analysis/vertical';
+export { IdorEnumerationAnalyzer } from './analysis/idor';
 export { runScan, AuthorizationError, type ScanOptions, type ScanOutcome } from './orchestrator/scan';
 export {
   writeReports,

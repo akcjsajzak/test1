@@ -15,6 +15,7 @@ users:
   - name: "user_a"
     role: "user"
     privilegeLevel: 10
+    # tenant: "org-1"        # optional; enables cross-tenant vs same-tenant triage
     cookies:
       - name: "session"
         value: "${USER_A_SESSION}"
@@ -72,6 +73,12 @@ replay:
   allowedMethods: ["GET", "HEAD", "OPTIONS"]  # safe methods only by default
   allowDestructive: false                      # POST/PUT/PATCH/DELETE not replayed
   maxReplays: 500
+
+idor:
+  enabled: false            # opt-in active enumeration (issues constructed requests)
+  numericNeighbors: 3       # probe id-n .. id+n around observed numeric ids
+  maxProbesPerEndpoint: 8
+  maxTotalProbes: 200
 
 compare:
   ignoreFields: ["csrf", "csrfToken", "_token", "timestamp", "ts", "nonce", "requestId", "traceId"]

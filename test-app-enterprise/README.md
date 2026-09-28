@@ -67,9 +67,17 @@ differentiation, so the auditor reports access from **same-org peers** as well a
 the genuinely-dangerous **cross-tenant** case (e.g. Globex's Mallory reaching an
 Acme resource). This is expected in black-box authorization testing: the endpoint
 performs *no* membership check, and the tool surfaces every context that reached
-it. Use the finding's evidence (which user/tenant reached it) to separate the
-cross-tenant vulnerability from same-tenant sharing — the tool never hides the
-cross-tenant hits behind a tenancy guess.
+it.
+
+When users declare a `tenant` (as in `examples/enterprise.yaml`), these are
+separated automatically via finding **tags**: `cross-tenant` stays high-severity,
+`same-tenant-shared` (a peer reaching a tenant-scoped resource of their own
+tenant) is downgraded to `info`, and `same-tenant` (a peer reaching another
+user's *per-user* resource, e.g. a private ticket) stays a real finding. Filter
+by tag to focus on the cross-tenant breaches. With `idor.enabled`, the active
+enumeration analyzer additionally shows which endpoints let a user retrieve
+records by guessing sequential ids (and correctly ignores the secured ones,
+which deny some ids).
 
 ## Scan it
 

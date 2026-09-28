@@ -5,6 +5,7 @@ import {
   resourceMarkers,
   markersPresent,
   isDataBearingResource,
+  resourceTenantScoped,
 } from '../../src/analysis/authz-common';
 import type { ObservedRequest } from '../../src/core/types';
 
@@ -50,6 +51,21 @@ describe('resourceMarkers / markersPresent', () => {
     const markers = resourceMarkers(r);
     expect(markers).toContain('4815');
     expect(markersPresent('{"order":{"id":4815}}', markers)).toEqual(['4815']);
+  });
+});
+
+describe('resourceTenantScoped', () => {
+  it('matches a tenant id after a tenant-collection segment', () => {
+    expect(resourceTenantScoped('https://x.test/api/orgs/1/projects/5', '1')).toBe(true);
+    expect(resourceTenantScoped('https://x.test/api/tenants/42/users', '42')).toBe(true);
+  });
+  it('does NOT match a per-user object id that merely equals the tenant id', () => {
+    // /api/users/1 must not be treated as tenant-scoped just because tenant is "1".
+    expect(resourceTenantScoped('https://x.test/api/users/1', '1')).toBe(false);
+    expect(resourceTenantScoped('https://x.test/api/tickets/1', '1')).toBe(false);
+  });
+  it('does not match a different tenant id', () => {
+    expect(resourceTenantScoped('https://x.test/api/orgs/1/projects', '2')).toBe(false);
   });
 });
 

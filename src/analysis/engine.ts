@@ -29,6 +29,8 @@ export interface UserInfo {
   name: string;
   role?: string;
   privilegeLevel?: number;
+  /** optional tenant/org identifier for cross-tenant reasoning. */
+  tenant?: string;
 }
 
 /** Everything an analyzer needs, without depending on concrete engine classes. */

@@ -26,6 +26,7 @@ referenced as `${ENV_VAR}` (or `${ENV_VAR:-default}`) and injected at runtime.
 | `name` | string | — | Logical id (`user_a`, `admin`, …). |
 | `role` | string | — | Reporting label; also used to infer privilege. |
 | `privilegeLevel` | int ≥0 | inferred | Higher = more privileged. `anonymous`=0. Drives vertical analysis. |
+| `tenant` | string/number | — | Optional tenant/org id. When set on the users involved, cross-tenant access is elevated + tagged `cross-tenant`, and same-tenant access to a tenant-scoped resource (e.g. `/orgs/{tenant}/…`) is downgraded to `info` + tagged `same-tenant-shared`. |
 | `cookies[]` | list | `[]` | `{ name, value, domain?, path?, httpOnly?, secure?, sameSite? }`. |
 | `headers[]` | list | `[]` | `{ name, value }` extra HTTP headers (e.g. `Authorization`). |
 | `localStorage[]` | list | `[]` | `{ name, value }` seeded into the isolated context. |
@@ -70,6 +71,23 @@ Privilege inference (when `privilegeLevel` is omitted): `anonymous/guest`=0,
 | `allowedMethods` | `[GET, HEAD, OPTIONS]` | Only these are replayed… |
 | `allowDestructive` | `false` | …and mutating methods need this opt-in too. |
 | `maxReplays` | `500` | Replay budget. |
+
+## `idor`
+
+Active object-id enumeration (IDOR sweep). **Off by default** — it issues new,
+constructed requests (bounded, safe GET only) beyond what was observed.
+
+| Field | Default | Notes |
+| --- | --- | --- |
+| `enabled` | `false` | Turn on the enumeration analyzer. |
+| `numericNeighbors` | `3` | Probe `id-n … id+n` around each observed numeric id. |
+| `maxProbesPerEndpoint` | `8` | Cap probes per endpoint template. |
+| `maxTotalProbes` | `200` | Global cap on enumeration probes. |
+
+The analyzer probes sequential numeric ids under the observing user's own
+session, filters empty/absent responses via a sentinel probe, and suppresses
+endpoints that deny any id (they enforce object-level authorization). It reports
+one aggregated finding per `(user, endpoint)`.
 
 ## `compare`
 

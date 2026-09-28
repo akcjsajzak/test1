@@ -13,7 +13,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Analyzer, AnalysisContext } from './engine';
-import type { Confidence, Evidence, Finding } from '../core/types';
+import type { Confidence, Evidence, Finding, Severity } from '../core/types';
 import { compareResponses } from './compare';
 import {
   evidence,
@@ -24,6 +24,7 @@ import {
   provenanceOf,
   replayResponse,
   resourceMarkers,
+  resourceTenantScoped,
   snapshotObserved,
   snapshotReplay,
   sourceResponse,
@@ -39,6 +40,7 @@ export class HorizontalAnalyzer implements Analyzer {
   async analyze(ctx: AnalysisContext): Promise<Finding[]> {
     const findings: Finding[] = [];
     const privileges = new Map(ctx.users.map((u) => [u.name, privilegeOf(u)]));
+    const tenants = new Map(ctx.users.map((u) => [u.name, u.tenant]));
 
     for (const sourceInv of ctx.inventory.allUsers()) {
       const sourcePriv = privileges.get(sourceInv.user) ?? 10;
@@ -88,12 +90,24 @@ export class HorizontalAnalyzer implements Analyzer {
           const prov = provenanceOf(ctx.graphs, sourceReq.id);
           if (prov) ev.push(evidence('discovery action', prov));
 
+          // Tenant-aware severity: elevate cross-tenant, de-prioritize same-tenant
+          // access to a tenant-scoped resource (likely legitimate sharing).
+          let severity: Severity = present.length > 0 ? 'high' : 'medium';
+          let finalConfidence = confidence;
+          const tags = this.tenantAdjust(
+            tenants.get(sourceInv.user),
+            tenants.get(testUser.name),
+            sourceReq.url,
+            ev,
+            (s, c) => { severity = s; finalConfidence = c ?? finalConfidence; },
+          );
+
           findings.push({
             id: `${this.id}-${randomUUID().slice(0, 8)}`,
             type: this.id,
             title: `${testUser.name} can access ${sourceInv.user}'s resource at ${pathOf(sourceReq.url)}`,
-            severity: present.length > 0 ? 'high' : 'medium',
-            confidence,
+            severity,
+            confidence: finalConfidence,
             sourceUser: sourceInv.user,
             testUser: testUser.name,
             method: sourceReq.method,
@@ -106,6 +120,7 @@ export class HorizontalAnalyzer implements Analyzer {
             comparisonResponse: snapshotReplay(replay),
             diff,
             evidence: ev,
+            tags: tags.length ? tags : undefined,
             timestamp: Date.now(),
           });
         }
@@ -124,6 +139,36 @@ export class HorizontalAnalyzer implements Analyzer {
     if (verdict === 'identical') return markerCount === 0 ? 'medium' : 'high';
     if (verdict === 'access-granted') return 'medium';
     return undefined;
+  }
+
+  /**
+   * Apply tenant-aware severity/confidence. Only active when both users declare a
+   * tenant. Cross-tenant is elevated; same-tenant access to a tenant-scoped
+   * resource is de-prioritized (likely legitimate sharing); same-tenant access to
+   * a per-user resource stays as scored. Returns the tags to attach.
+   */
+  private tenantAdjust(
+    sourceTenant: string | number | undefined,
+    testTenant: string | number | undefined,
+    url: string,
+    ev: Evidence[],
+    set: (severity: Severity, confidence?: Confidence) => void,
+  ): string[] {
+    if (sourceTenant === undefined || testTenant === undefined) return [];
+    const s = String(sourceTenant);
+    const t = String(testTenant);
+    if (s !== t) {
+      ev.push(evidence('tenant boundary', `CROSSED — ${t}-tenant context reached a resource seen in tenant ${s}`));
+      set('high', 'high');
+      return ['cross-tenant'];
+    }
+    if (resourceTenantScoped(url, s)) {
+      ev.push(evidence('tenant boundary', `same tenant (${s}); tenant-scoped resource — likely legitimate intra-tenant sharing, verify`));
+      set('info', 'low');
+      return ['same-tenant-shared'];
+    }
+    ev.push(evidence('tenant boundary', `same tenant (${s}); per-user resource — cross-user access is still a finding`));
+    return ['same-tenant'];
   }
 }
 
