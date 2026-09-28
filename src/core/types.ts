@@ -222,6 +222,15 @@ export interface Evidence {
   detail: string;
 }
 
+/** A compact, redacted snapshot of a response, embedded in findings/reports. */
+export interface ResponseSnapshot {
+  status?: number;
+  contentType?: string;
+  size?: number;
+  /** redacted, truncated body preview. */
+  bodyPreview?: string;
+}
+
 /** A detection produced by an analyzer. */
 export interface Finding {
   id: string;
@@ -240,6 +249,10 @@ export interface Finding {
   triggeringAction?: string;
   observedRequestId?: string;
   comparisonRequestId?: string;
+  /** redacted snapshot of the source (authorized) response. */
+  observedResponse?: ResponseSnapshot;
+  /** redacted snapshot of the test/replay response being compared. */
+  comparisonResponse?: ResponseSnapshot;
   diff?: ResponseDiff;
   evidence: Evidence[];
   timestamp: number;

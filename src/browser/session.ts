@@ -88,6 +88,32 @@ export class UserSession {
       }, entries);
     }
 
+    // Hook client-side routing so SPA navigations (pushState/replaceState) are
+    // observable to the crawler, which polls window.__aa_routes.
+    await this.context.addInitScript(() => {
+      try {
+        const w = window as unknown as { __aa_routes?: string[] };
+        w.__aa_routes = w.__aa_routes || [];
+        const record = (url: unknown) => {
+          try {
+            if (url != null) w.__aa_routes!.push(new URL(String(url), location.href).href);
+          } catch {
+            /* ignore */
+          }
+        };
+        const wrap =
+          (orig: History['pushState']): History['pushState'] =>
+          function (this: History, data: unknown, unused: string, url?: string | URL | null) {
+            record(url);
+            return orig.call(this, data, unused, url as string);
+          };
+        history.pushState = wrap(history.pushState);
+        history.replaceState = wrap(history.replaceState);
+      } catch {
+        /* ignore */
+      }
+    });
+
     this.page = await this.context.newPage();
     this.page.setDefaultNavigationTimeout(this.opts.navigationTimeoutMs);
     this.page.setDefaultTimeout(this.opts.navigationTimeoutMs);

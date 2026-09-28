@@ -90,8 +90,13 @@
         list.appendChild(el('li', {}, [a]));
       });
       // Auto-load the first owned order's detail so the concrete resource id is
-      // observed even without a click (keeps the fixture deterministic).
-      if (orders[0]) api('/api/orders/' + orders[0].id);
+      // observed even without a click (keeps the fixture deterministic). Also
+      // exercise the securely-checked variant, which the auditor must NOT flag
+      // (it returns 403 to non-owners) — a true-negative demonstration.
+      if (orders[0]) {
+        api('/api/orders/' + orders[0].id);
+        api('/api/secure/orders/' + orders[0].id);
+      }
     });
   }
 

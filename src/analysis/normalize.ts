@@ -123,6 +123,16 @@ export function normalizeRequest(method: HttpMethod, rawUrl: string): NormalizeR
   };
 }
 
+/** Heuristic: does a path segment look like an opaque identifier (vs a word)? */
+function looksIdentifierLike(seg: string): boolean {
+  const s = safeDecode(seg);
+  if (s.length === 0) return false;
+  if (/\d/.test(s)) return true; // any digit strongly suggests an id
+  if (s.length >= 12) return true; // long opaque token
+  if (/[_-]/.test(s) && s.length >= 8) return true; // slug-like id
+  return false;
+}
+
 function isVolatileValue(v: string): boolean {
   return (
     UUID_RE.test(v) ||
@@ -186,12 +196,21 @@ export class NormalizerState {
     }
   }
 
-  /** Whether a given position has enough distinct values to be considered variable. */
+  /**
+   * Whether a position has enough distinct values to be treated as variable.
+   * To avoid collapsing legitimate REST collection names (e.g. /api/orders,
+   * /api/admin, /api/internal), a position is only considered variable when a
+   * strong majority of its observed values are identifier-like (contain a digit
+   * or are long/opaque) rather than short dictionary words.
+   */
   private positionIsVariable(method: HttpMethod, hostname: string, segs: string[], i: number): boolean {
     const prefix = segs.slice(0, i).join('/');
     const key = `${method.toUpperCase()} ${hostname}${prefix}/[${i}]`;
     const set = this.positionValues.get(key);
-    return !!set && set.size >= this.threshold;
+    if (!set || set.size < this.threshold) return false;
+    let idish = 0;
+    for (const v of set) if (looksIdentifierLike(v)) idish += 1;
+    return idish / set.size >= 0.6;
   }
 
   /** Second pass: normalize using both rules and learned variability. */

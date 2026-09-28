@@ -1,0 +1,87 @@
+# web-auth-auditor example configuration (YAML).
+#
+# Secrets (session cookies, tokens) are referenced as ${ENV_VAR} and injected at
+# runtime — never commit real session values into this file.
+#
+# Run:  web-auth-auditor scan --config config.example.yaml --output ./results
+
+# You must confirm you are authorized to test the target.
+authorizedTesting: true
+
+target:
+  url: "https://example.test/"
+
+users:
+  - name: "user_a"
+    role: "user"
+    privilegeLevel: 10
+    cookies:
+      - name: "session"
+        value: "${USER_A_SESSION}"
+
+  - name: "user_b"
+    role: "user"
+    privilegeLevel: 10
+    cookies:
+      - name: "session"
+        value: "${USER_B_SESSION}"
+
+  - name: "admin"
+    role: "admin"
+    privilegeLevel: 100
+    cookies:
+      - name: "session"
+        value: "${ADMIN_SESSION}"
+
+  # An anonymous context (no cookies) is useful for vertical checks: it should be
+  # denied everywhere a login is required.
+  - name: "anonymous"
+    role: "anonymous"
+    privilegeLevel: 0
+
+# Optional intercepting/forwarding proxy for the browser.
+# proxy:
+#   type: "http"            # http | https | socks5 | socks4
+#   url: "http://127.0.0.1:8080"
+
+scope:
+  allowedDomains: []        # the target host is always in scope; add extra hosts here
+  allowSubdomains: true
+  deniedDomains: []
+  # Discovered hosts resolving into these ranges are never navigated/replayed.
+  deniedIpRanges: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"]
+  excludeHosts: ["google-analytics.com", "googletagmanager.com", "sentry.io"]
+  excludeUrlPatterns: ["/analytics", "/telemetry", "/collect", "/beacon"]
+  maxRequests: 2000
+  maxDurationSeconds: 600
+  requestsPerSecond: 8
+
+crawl:
+  maxDepth: 3
+  maxPages: 60
+  maxActions: 400
+  maxRequests: 1500
+  maxDurationSeconds: 300
+  interact: true
+  submitForms: false        # forms can mutate state; off by default
+  includeDestructive: false # never auto-trigger destructive actions
+  settleMs: 400
+
+replay:
+  enabled: true
+  allowedMethods: ["GET", "HEAD", "OPTIONS"]  # safe methods only by default
+  allowDestructive: false                      # POST/PUT/PATCH/DELETE not replayed
+  maxReplays: 500
+
+compare:
+  ignoreFields: ["csrf", "csrfToken", "_token", "timestamp", "ts", "nonce", "requestId", "traceId"]
+  ignoreHeaders: ["date", "set-cookie", "etag", "last-modified", "x-request-id"]
+
+browser:
+  headless: true
+  # executablePath: "/opt/pw-browsers/chromium"   # auto-detected when omitted
+  navigationTimeoutMs: 20000
+
+output:
+  dir: "./results"
+  formats: ["json", "html"]
