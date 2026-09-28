@@ -1,0 +1,37 @@
+# Ready-to-run config for the bundled vulnerable test app (test-app/).
+#
+# Start the app first:   PORT=4123 npm run test:app
+# Then scan it:
+#   USER_A_SESSION=token_user_a USER_B_SESSION=token_user_b ADMIN_SESSION=token_admin \
+#     node dist/cli.js scan --config examples/localhost.yaml --output ./results
+
+authorizedTesting: true
+
+target:
+  url: "http://127.0.0.1:4123/"
+
+users:
+  - name: "user_a"
+    role: "user"
+    privilegeLevel: 10
+    cookies: [{ name: "session", value: "${USER_A_SESSION}" }]
+  - name: "user_b"
+    role: "user"
+    privilegeLevel: 10
+    cookies: [{ name: "session", value: "${USER_B_SESSION}" }]
+  - name: "admin"
+    role: "admin"
+    privilegeLevel: 100
+    cookies: [{ name: "session", value: "${ADMIN_SESSION}" }]
+  - name: "anonymous"
+    role: "anonymous"
+    privilegeLevel: 0
+
+crawl:
+  maxDepth: 3
+  maxPages: 30
+  settleMs: 300
+
+output:
+  dir: "./results"
+  formats: ["json", "html"]

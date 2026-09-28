@@ -37,7 +37,8 @@ node dist/cli.js scan --config examples/config.example.yaml --output ./results
 ```
 
 Full instructions: [docs/INSTALL-debian.md](docs/INSTALL-debian.md) ·
-[docs/USAGE.md](docs/USAGE.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+[docs/USAGE.md](docs/USAGE.md) · [docs/CONFIG.md](docs/CONFIG.md) ·
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [test-app/](test-app/README.md).
 
 ## Architecture (overview)
 
